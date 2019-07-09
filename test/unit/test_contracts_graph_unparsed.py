@@ -6,7 +6,8 @@ from hologram import ValidationError
 from dbt.contracts.graph.unparsed import (
     UnparsedNode, UnparsedRunHook, UnparsedMacro, Time, TimePeriod,
     FreshnessStatus, FreshnessThreshold, Quoting, UnparsedSourceDefinition,
-    UnparsedSourceTableDefinition, UnparsedDocumentationFile
+    UnparsedSourceTableDefinition, UnparsedDocumentationFile, NamedTested,
+    UnparsedNodeUpdate
 )
 from dbt.node_types import NodeType
 
@@ -35,7 +36,7 @@ class ContractTestCase(TestCase):
 class TestUnparsedNode(ContractTestCase):
     ContractType = UnparsedNode
 
-    def test_unparsed_node_ok(self):
+    def test_ok(self):
         node_dict = {
             'name': 'foo',
             'root_path': '/root/',
@@ -60,7 +61,7 @@ class TestUnparsedNode(ContractTestCase):
         self.assert_fails_validation(node_dict, cls=UnparsedRunHook)
         self.assert_fails_validation(node_dict, cls=UnparsedMacro)
 
-    def test_empty_unparsed_node(self):
+    def test_empty(self):
         node_dict = {
             'name': 'foo',
             'root_path': '/root/',
@@ -85,7 +86,7 @@ class TestUnparsedNode(ContractTestCase):
         self.assert_fails_validation(node_dict, cls=UnparsedRunHook)
         self.assert_fails_validation(node_dict, cls=UnparsedMacro)
 
-    def test_unparsed_node_bad_type(self):
+    def test_bad_type(self):
         node_dict = {
             'name': 'foo',
             'root_path': '/root/',
@@ -101,7 +102,7 @@ class TestUnparsedNode(ContractTestCase):
 class TestUnparsedRunHook(ContractTestCase):
     ContractType = UnparsedRunHook
 
-    def test_unparsed_run_hook_ok(self):
+    def test_ok(self):
         node_dict = {
             'name': 'foo',
             'root_path': 'test/dbt_project.yml',
@@ -125,7 +126,7 @@ class TestUnparsedRunHook(ContractTestCase):
         self.assert_symmetric(node, node_dict)
         self.assert_fails_validation(node_dict, cls=UnparsedNode)
 
-    def test_unparsed_run_hook_bad_type(self):
+    def test_bad_type(self):
         node_dict = {
             'name': 'foo',
             'root_path': 'test/dbt_project.yml',
@@ -142,13 +143,13 @@ class TestUnparsedRunHook(ContractTestCase):
 class TestFreshnessThreshold(ContractTestCase):
     ContractType = FreshnessThreshold
 
-    def test_empty_freshness_threshold(self):
+    def test_empty(self):
         empty = FreshnessThreshold(None, None)
         self.assert_symmetric(empty, {})
         self.assertEqual(empty.status(float('Inf')), FreshnessStatus.Pass)
         self.assertEqual(empty.status(0), FreshnessStatus.Pass)
 
-    def test_both_freshness_threshold(self):
+    def test_both(self):
         threshold = FreshnessThreshold(
             warn_after=Time(count=18, period=TimePeriod.hour),
             error_after=Time(count=2, period=TimePeriod.day),
@@ -166,7 +167,7 @@ class TestFreshnessThreshold(ContractTestCase):
         self.assertEqual(threshold.status(warn_seconds), FreshnessStatus.Warn)
         self.assertEqual(threshold.status(pass_seconds), FreshnessStatus.Pass)
 
-    def test_merged_freshness_threshold(self):
+    def test_merged(self):
         t1 = FreshnessThreshold(
             warn_after=Time(count=36, period=TimePeriod.hour),
             error_after=Time(count=2, period=TimePeriod.day),
@@ -195,7 +196,7 @@ class TestQuoting(ContractTestCase):
         empty = Quoting()
         self.assert_symmetric(empty, {})
 
-    def test_partial_quotings(self):
+    def test_partial(self):
         a = Quoting(None, True, False)
         b = Quoting(True, False, None)
         self.assert_symmetric(a, {'schema': True, 'identifier': False})
@@ -288,3 +289,83 @@ class TestUnparsedSourceDefinition(ContractTestCase):
 
 class TestUnparsedDocumentationFile(ContractTestCase):
     ContractType = UnparsedDocumentationFile
+
+    def test_ok(self):
+        doc = UnparsedDocumentationFile(
+            package_name='test',
+            root_path='/root',
+            path='/root/docs',
+            original_file_path='/root/docs/doc.md',
+            file_contents='blah blah blah',
+        )
+        doc_dict = {
+            'package_name': 'test',
+            'root_path': '/root',
+            'path': '/root/docs',
+            'original_file_path': '/root/docs/doc.md',
+            'file_contents': 'blah blah blah',
+        }
+        self.assert_symmetric(doc, doc_dict)
+        self.assertEqual(doc.resource_type, NodeType.Documentation)
+        self.assert_fails_validation(doc_dict, UnparsedNode)
+
+    def test_extra_field(self):
+        self.assert_fails_validation({})
+        doc_dict = {
+            'package_name': 'test',
+            'root_path': '/root',
+            'path': '/root/docs',
+            'original_file_path': '/root/docs/doc.md',
+            'file_contents': 'blah blah blah',
+            'resource_type': 'docs',
+        }
+        self.assert_fails_validation(doc_dict)
+
+
+class TestUnparsedNodeUpdate(ContractTestCase):
+    ContractType = UnparsedNodeUpdate
+
+    def test_defaults(self):
+        minimum = UnparsedNodeUpdate(name='foo')
+        from_dict = {'name': 'foo'}
+        to_dict = {'name': 'foo', 'columns': [], 'description': '', 'tests': []}
+        self.assert_from_dict(minimum, from_dict)
+        self.assert_to_dict(minimum, to_dict)
+
+    def test_contents(self):
+        update = UnparsedNodeUpdate(
+            name='foo',
+            description='a description',
+            tests=['table_test'],
+            columns=[
+                NamedTested(name='x', description='x description'),
+                NamedTested(
+                    name='y',
+                    description='y description',
+                    tests=[
+                        'unique',
+                        {'accepted_values': {'values': ['blue', 'green']}}
+                    ]
+                ),
+            ],
+        )
+        dct = {
+            'name': 'foo',
+            'description': 'a description',
+            'tests': ['table_test'],
+            'columns': [
+                {'name': 'x', 'description': 'x description', 'tests': []},
+                {
+                    'name': 'y',
+                    'description': 'y description',
+                    'tests': [
+                        'unique',
+                        {'accepted_values': {'values': ['blue', 'green']}}
+                    ],
+                },
+            ],
+        }
+        self.assert_symmetric(update, dct)
+
+    # def test_bad(self):
+

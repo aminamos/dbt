@@ -1,9 +1,10 @@
-from dbt.contracts.util import Replaceable, Mergeable
+from dbt.contracts.util import Replaceable, Mergeable, AnyJson
 from dbt.logger import GLOBAL_LOGGER as logger  # noqa
 from dbt import tracking
 from dbt.ui import printer
+from dbt.utils import JSONEncoder
 
-from hologram import JsonSchemaMixin, FieldEncoder
+from hologram import JsonSchemaMixin
 from hologram.helpers import HyphenatedJsonSchemaMixin, NewPatternType, \
     ExtensibleJsonSchemaMixin
 
@@ -26,18 +27,9 @@ SemverString = NewPatternType(
 )
 
 
-class AnyCredentialsEncoder(FieldEncoder):
-    @property
-    def json_schema(self):
-        return {
-            'type': ['null', 'string', 'number', 'array', 'boolean', 'object'],
-            'additionalProperties': True,
-        }
-
-
 AnyCredentials = NewType('AnyCredentials', Any)
 JsonSchemaMixin.register_field_encoders(
-    {AnyCredentials: AnyCredentialsEncoder()}
+    {AnyCredentials: AnyJson(encoder=JSONEncoder)}
 )
 
 

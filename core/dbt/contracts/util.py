@@ -1,6 +1,9 @@
 from dbt.clients.system import write_json
 
+from hologram import FieldEncoder
+
 import dataclasses
+import json
 
 
 class Replaceable:
@@ -27,3 +30,24 @@ class Mergeable(Replaceable):
 class Writable:
     def write(self, path: str, omit_none: bool = True):
         write_json(path, self.to_dict(omit_none=omit_none))
+
+
+class AnyJson(FieldEncoder):
+    def __init__(self, encoder=None, decoder=None):
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def to_wire(self, value):
+        as_str = json.dumps(value, cls=self.encoder)
+        return json.loads(as_str)
+
+    def to_python(self, value):
+        as_str = json.dumps(value)
+        return json.loads(as_str, cls=self.decoder)
+
+    @property
+    def json_schema(self):
+        return {
+            'type': ['object'],
+            'additionalProperties': True,
+        }
