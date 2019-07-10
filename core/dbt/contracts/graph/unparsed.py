@@ -1,19 +1,12 @@
 from dbt.node_types import UnparsedNodeType, NodeType, OperationType
-from dbt.contracts.util import Replaceable, Mergeable, AnyJson
-from dbt.utils import JSONEncoder
+from dbt.contracts.util import Replaceable, Mergeable
 
 from hologram import JsonSchemaMixin
 from hologram.helpers import StrEnum
 
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Optional, List, Any, Union, NewType
-
-
-AnyTestSpec = NewType('AnyTestSpec', Any)
-JsonSchemaMixin.register_field_encoders(
-    {AnyTestSpec: AnyJson(encoder=JSONEncoder)}
-)
+from typing import Optional, List, Union, Dict, Any
 
 
 @dataclass
@@ -54,7 +47,7 @@ class UnparsedRunHook(UnparsedNode):
 class NamedTested(JsonSchemaMixin, Replaceable):
     name: str
     description: str = ''
-    tests: Optional[List[Union[AnyTestSpec, str]]] = None
+    tests: Optional[List[Union[Dict[str, Any], str]]] = None
 
     def __post_init__(self):
         if self.tests is None:

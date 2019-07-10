@@ -367,5 +367,59 @@ class TestUnparsedNodeUpdate(ContractTestCase):
         }
         self.assert_symmetric(update, dct)
 
-    # def test_bad(self):
+    def test_bad_test_type(self):
+        dct = {
+            'name': 'foo',
+            'description': 'a description',
+            'tests': ['table_test'],
+            'columns': [
+                {'name': 'x', 'description': 'x description', 'tests': []},
+                {
+                    'name': 'y',
+                    'description': 'y description',
+                    'tests': [
+                        100,
+                        {'accepted_values': {'values': ['blue', 'green']}}
+                    ],
+                },
+            ],
+        }
+        self.assert_fails_validation(dct)
+
+        dct = {
+            'name': 'foo',
+            'description': 'a description',
+            'tests': ['table_test'],
+            'columns': [
+                # column missing a name
+                {'description': 'x description', 'tests': []},
+                {
+                    'name': 'y',
+                    'description': 'y description',
+                    'tests': [
+                        'unique',
+                        {'accepted_values': {'values': ['blue', 'green']}}
+                    ],
+                },
+            ],
+        }
+        self.assert_fails_validation(dct)
+
+        # missing a name
+        dct = {
+            'description': 'a description',
+            'tests': ['table_test'],
+            'columns': [
+                {'name': 'x', 'description': 'x description', 'tests': []},
+                {
+                    'name': 'y',
+                    'description': 'y description',
+                    'tests': [
+                        'unique',
+                        {'accepted_values': {'values': ['blue', 'green']}}
+                    ],
+                },
+            ],
+        }
+        self.assert_fails_validation(dct)
 

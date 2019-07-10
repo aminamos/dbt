@@ -1,15 +1,15 @@
-from dbt.contracts.util import Replaceable, Mergeable, AnyJson
+from dbt.contracts.util import Replaceable, Mergeable
 from dbt.logger import GLOBAL_LOGGER as logger  # noqa
 from dbt import tracking
 from dbt.ui import printer
-from dbt.utils import JSONEncoder
+# from dbt.utils import JSONEncoder
 
 from hologram import JsonSchemaMixin
 from hologram.helpers import HyphenatedJsonSchemaMixin, NewPatternType, \
     ExtensibleJsonSchemaMixin
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Union, Any, NewType
+from typing import Optional, List, Dict, Union, Any
 
 PIN_PACKAGE_URL = 'https://docs.getdbt.com/docs/package-management#section-specifying-package-versions' # noqa
 DEFAULT_SEND_ANONYMOUS_USAGE_STATS = True
@@ -24,12 +24,6 @@ Name = NewPatternType('Name', r'^[^\d\W]\w*\Z')
 SemverString = NewPatternType(
     'SemverString',
     r'^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(\.(?:0|[1-9]\d*))?$',
-)
-
-
-AnyCredentials = NewType('AnyCredentials', Any)
-JsonSchemaMixin.register_field_encoders(
-    {AnyCredentials: AnyJson(encoder=JSONEncoder)}
 )
 
 
@@ -148,7 +142,7 @@ class ProfileConfig(HyphenatedJsonSchemaMixin, Replaceable):
     config: UserConfig
     threads: int
     # TODO: make this a dynamic union of some kind?
-    credentials: Optional[AnyCredentials]
+    credentials: Optional[Any]
 
 
 @dataclass
