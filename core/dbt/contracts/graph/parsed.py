@@ -49,8 +49,8 @@ Severity = NewPatternType('Severity', insensitive_patterns('warn', 'error'))
 
 @dataclass
 class NodeConfig(JsonSchemaMixin, Replaceable):
-    enabled: bool
-    materialized: str
+    enabled: bool = True
+    materialized: str = 'view'
     persist_docs: Dict[str, Any] = field(default_factory=dict)
     post_hook: List[Hook] = field(default_factory=list)
     pre_hook: List[Hook] = field(default_factory=list)
@@ -63,12 +63,6 @@ class NodeConfig(JsonSchemaMixin, Replaceable):
     def __post_init__(self):
         if isinstance(self.tags, str):
             self.tags = [self.tags]
-
-        if isinstance(self.post_hook, (str, dict)):
-            self.post_hook = [self.post_hook]
-
-        if isinstance(self.pre_hook, (str, dict)):
-            self.pre_hook = [self.pre_hook]
 
     @property
     def extra(self):
@@ -123,7 +117,7 @@ class ColumnInfo(JsonSchemaMixin, Replaceable):
 class Docref(JsonSchemaMixin, Replaceable):
     documentation_name: str
     documentation_package: str
-    column_name: Optional[str]
+    column_name: Optional[str] = None
 
 
 @dataclass
@@ -140,13 +134,6 @@ class HasUniqueID(JsonSchemaMixin, Replaceable):
 class DependsOn(JsonSchemaMixin, Replaceable):
     nodes: List[str] = field(default_factory=list)
     macros: List[str] = field(default_factory=list)
-
-
-@dataclass
-class CanRef(JsonSchemaMixin, Replaceable):
-    refs: List[List[Any]]
-    sources: List[List[Any]]
-    depends_on: DependsOn
 
 
 @dataclass
@@ -190,24 +177,34 @@ class ParsedNodeMixins:
         return self.config.vars
 
 
-# TODO(jeb): hooks should get their own parsed type instead of including
-# index everywhere!
 @dataclass
-class ParsedNode(
-        UnparsedNode,
-        HasUniqueID,
-        HasFqn,
-        CanRef,
-        HasRelationMetadata,
-        ParsedNodeMixins):
+class ParsedNodeMandatory(
+    UnparsedNode,
+    HasUniqueID,
+    HasFqn,
+    HasRelationMetadata,
+):
     alias: str
-    tags: List[str]
-    config: NodeConfig
+
+
+@dataclass
+class ParsedNodeDefaults(ParsedNodeMandatory):
+    config: NodeConfig = field(default_factory=NodeConfig)
+    tags: List[str] = field(default_factory=list)
+    refs: List[List[Any]] = field(default_factory=list)
+    sources: List[List[Any]] = field(default_factory=list)
+    depends_on: DependsOn = field(default_factory=DependsOn)
     docrefs: List[Docref] = field(default_factory=list)
     description: str = field(default='')
     columns: Dict[str, ColumnInfo] = field(default_factory=dict)
     patch_path: Optional[str] = None
     build_path: Optional[str] = None
+
+
+# TODO(jeb): hooks should get their own parsed type instead of including
+# index everywhere!
+@dataclass
+class ParsedNode(ParsedNodeDefaults, ParsedNodeMixins):
     index: Optional[int] = None
 
 
@@ -217,36 +214,23 @@ class TestConfig(NodeConfig):
 
 
 @dataclass
-class ParsedTestNode(
-        UnparsedNode,
-        HasUniqueID,
-        HasFqn,
-        CanRef,
-        HasRelationMetadata,
-        ParsedNodeMixins):
+class ParsedTestNode(ParsedNodeDefaults, ParsedNodeMixins):
     resource_type: TestType
-    alias: str
-    tags: List[str]
-    config: TestConfig
-    docrefs: List[Docref] = field(default_factory=list)
-    description: str = field(default='')
-    columns: Dict[str, ColumnInfo] = field(default_factory=dict)
-    patch_path: Optional[str] = None
-    build_path: Optional[str] = None
     column_name: Optional[str] = None
+    config: TestConfig = field(default_factory=TestConfig)
 
 
 @dataclass(init=False)
 class _SnapshotConfig(NodeConfig):
     unique_key: str
-    target_schema: str = None
-    target_database: str = None
+    target_schema: str
+    target_database: str
 
     def __init__(
         self,
         unique_key: str,
-        target_database: str = None,
-        target_schema: str = None,
+        target_database: str,
+        target_schema: str,
         **kwargs
     ) -> None:
 
@@ -299,7 +283,6 @@ class IntermediateSnapshotNode(ParsedNode):
     # uses a regular node config, which the snapshot parser will then convert
     # into a full ParsedSnapshotNode after rendering.
     resource_type: SnapshotType
-    config: NodeConfig
 
 
 def _create_if_else_chain(

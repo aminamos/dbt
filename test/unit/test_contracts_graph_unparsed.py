@@ -1,7 +1,4 @@
 from datetime import timedelta
-from unittest import TestCase
-
-from hologram import ValidationError
 
 from dbt.contracts.graph.unparsed import (
     UnparsedNode, UnparsedRunHook, UnparsedMacro, Time, TimePeriod,
@@ -10,27 +7,7 @@ from dbt.contracts.graph.unparsed import (
     UnparsedNodeUpdate
 )
 from dbt.node_types import NodeType
-
-
-class ContractTestCase(TestCase):
-    ContractType = None
-
-    def assert_to_dict(self, obj, dct):
-        self.assertEqual(obj.to_dict(), dct)
-
-    def assert_from_dict(self, obj, dct):
-        self.assertEqual(self.ContractType.from_dict(dct),  obj)
-
-    def assert_symmetric(self, obj, dct):
-        self.assert_to_dict(obj, dct)
-        self.assert_from_dict(obj, dct)
-
-    def assert_fails_validation(self, dct, cls=None):
-        if cls is None:
-            cls = self.ContractType
-
-        with self.assertRaises(ValidationError):
-            cls.from_dict(dct)
+from .utils import ContractTestCase
 
 
 class TestUnparsedNode(ContractTestCase):
@@ -422,4 +399,3 @@ class TestUnparsedNodeUpdate(ContractTestCase):
             ],
         }
         self.assert_fails_validation(dct)
-
