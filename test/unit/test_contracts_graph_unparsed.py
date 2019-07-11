@@ -10,6 +10,48 @@ from dbt.node_types import NodeType
 from .utils import ContractTestCase
 
 
+class TestUnparsedMacro(ContractTestCase):
+    ContractType = UnparsedMacro
+
+    def test_ok(self):
+        macro_dict = {
+            'path': '/root/path.sql',
+            'original_file_path': '/root/path.sql',
+            'package_name': 'test',
+            'raw_sql': '{% macro foo() %}select 1 as id{% endmacro %}',
+            'root_path': '/root/',
+        }
+        macro = self.ContractType(
+            path='/root/path.sql',
+            original_file_path='/root/path.sql',
+            package_name='test',
+            raw_sql='{% macro foo() %}select 1 as id{% endmacro %}',
+            root_path='/root/',
+        )
+        self.assert_symmetric(macro, macro_dict)
+
+    def test_invalid_missing_field(self):
+        macro_dict = {
+            'path': '/root/path.sql',
+            'original_file_path': '/root/path.sql',
+            # 'package_name': 'test',
+            'raw_sql': '{% macro foo() %}select 1 as id{% endmacro %}',
+            'root_path': '/root/',
+        }
+        self.assert_fails_validation(macro_dict)
+
+    def test_invalid_extra_field(self):
+        macro_dict = {
+            'path': '/root/path.sql',
+            'original_file_path': '/root/path.sql',
+            'package_name': 'test',
+            'raw_sql': '{% macro foo() %}select 1 as id{% endmacro %}',
+            'root_path': '/root/',
+            'extra': 'extra',
+        }
+        self.assert_fails_validation(macro_dict)
+
+
 class TestUnparsedNode(ContractTestCase):
     ContractType = UnparsedNode
 
@@ -23,7 +65,7 @@ class TestUnparsedNode(ContractTestCase):
             'package_name': 'test',
             'raw_sql': 'select * from {{ ref("thing") }}',
         }
-        node = UnparsedNode(
+        node = self.ContractType(
             package_name='test',
             root_path='/root/',
             path='/root/x/path.sql',
@@ -90,7 +132,7 @@ class TestUnparsedRunHook(ContractTestCase):
             'raw_sql': 'GRANT select on dbt_postgres',
             'index': 4
         }
-        node = UnparsedRunHook(
+        node = self.ContractType(
             package_name='test',
             root_path='test/dbt_project.yml',
             path='/root/dbt_project.yml',
@@ -121,13 +163,13 @@ class TestFreshnessThreshold(ContractTestCase):
     ContractType = FreshnessThreshold
 
     def test_empty(self):
-        empty = FreshnessThreshold(None, None)
+        empty = self.ContractType(None, None)
         self.assert_symmetric(empty, {})
         self.assertEqual(empty.status(float('Inf')), FreshnessStatus.Pass)
         self.assertEqual(empty.status(0), FreshnessStatus.Pass)
 
     def test_both(self):
-        threshold = FreshnessThreshold(
+        threshold = self.ContractType(
             warn_after=Time(count=18, period=TimePeriod.hour),
             error_after=Time(count=2, period=TimePeriod.day),
         )
@@ -145,14 +187,14 @@ class TestFreshnessThreshold(ContractTestCase):
         self.assertEqual(threshold.status(pass_seconds), FreshnessStatus.Pass)
 
     def test_merged(self):
-        t1 = FreshnessThreshold(
+        t1 = self.ContractType(
             warn_after=Time(count=36, period=TimePeriod.hour),
             error_after=Time(count=2, period=TimePeriod.day),
         )
-        t2 = FreshnessThreshold(
+        t2 = self.ContractType(
             warn_after=Time(count=18, period=TimePeriod.hour),
         )
-        threshold = FreshnessThreshold(
+        threshold = self.ContractType(
             warn_after=Time(count=18, period=TimePeriod.hour),
             error_after=Time(count=2, period=TimePeriod.day),
         )
@@ -170,17 +212,17 @@ class TestQuoting(ContractTestCase):
     ContractType = Quoting
 
     def test_empty(self):
-        empty = Quoting()
+        empty = self.ContractType()
         self.assert_symmetric(empty, {})
 
     def test_partial(self):
-        a = Quoting(None, True, False)
-        b = Quoting(True, False, None)
+        a = self.ContractType(None, True, False)
+        b = self.ContractType(True, False, None)
         self.assert_symmetric(a, {'schema': True, 'identifier': False})
         self.assert_symmetric(b, {'database': True, 'schema': False})
 
         c = a.merged(b)
-        self.assertEqual(c, Quoting(True, False, False))
+        self.assertEqual(c, self.ContractType(True, False, False))
         self.assert_symmetric(
             c, {'database': True, 'schema': False, 'identifier': False}
         )
@@ -190,12 +232,12 @@ class TestUnparsedSourceDefinition(ContractTestCase):
     ContractType = UnparsedSourceDefinition
 
     def test_defaults(self):
-        minimum = UnparsedSourceDefinition(name='foo')
+        minimum = self.ContractType(name='foo')
         self.assert_from_dict(minimum, {'name': 'foo'})
         self.assert_to_dict(minimum, {'name': 'foo', 'description': '', 'quoting': {}, 'freshness': {}, 'tables': [], 'loader': ''})
 
     def test_contents(self):
-        empty = UnparsedSourceDefinition(
+        empty = self.ContractType(
             name='foo',
             description='a description',
             quoting=Quoting(database=False),
@@ -220,7 +262,7 @@ class TestUnparsedSourceDefinition(ContractTestCase):
             description='table 2',
             quoting=Quoting(database=True),
         )
-        source = UnparsedSourceDefinition(
+        source = self.ContractType(
             name='foo',
             tables=[table_1, table_2]
         )
@@ -268,7 +310,7 @@ class TestUnparsedDocumentationFile(ContractTestCase):
     ContractType = UnparsedDocumentationFile
 
     def test_ok(self):
-        doc = UnparsedDocumentationFile(
+        doc = self.ContractType(
             package_name='test',
             root_path='/root',
             path='/root/docs',
@@ -303,14 +345,14 @@ class TestUnparsedNodeUpdate(ContractTestCase):
     ContractType = UnparsedNodeUpdate
 
     def test_defaults(self):
-        minimum = UnparsedNodeUpdate(name='foo')
+        minimum = self.ContractType(name='foo')
         from_dict = {'name': 'foo'}
         to_dict = {'name': 'foo', 'columns': [], 'description': '', 'tests': []}
         self.assert_from_dict(minimum, from_dict)
         self.assert_to_dict(minimum, to_dict)
 
     def test_contents(self):
-        update = UnparsedNodeUpdate(
+        update = self.ContractType(
             name='foo',
             description='a description',
             tests=['table_test'],

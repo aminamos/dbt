@@ -112,10 +112,6 @@ class SnowflakeConnectionManager(SQLConnectionManager):
 
             handle = snowflake.connector.connect(
                 account=creds.account,
-                # TODO: the previous code tried to make it optional as of the
-                # addition of  Snowflake, but 'user' is required by the schema,
-                # so it was always present. Should it be optional and be part
-                # of auth_args?
                 user=creds.user,
                 database=creds.database,
                 schema=creds.schema,

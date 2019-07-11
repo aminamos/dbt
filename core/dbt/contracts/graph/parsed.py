@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict, Any, Type, Tuple
 
 from hologram import JsonSchemaMixin
-from hologram.helpers import StrEnum, NewPatternType
+from hologram.helpers import StrEnum, NewPatternType, ExtensibleJsonSchemaMixin
 
 import dbt.clients.jinja
 from dbt.contracts.graph.unparsed import (
@@ -48,7 +48,7 @@ Severity = NewPatternType('Severity', insensitive_patterns('warn', 'error'))
 
 
 @dataclass
-class NodeConfig(JsonSchemaMixin, Replaceable):
+class NodeConfig(ExtensibleJsonSchemaMixin, Replaceable):
     enabled: bool = True
     materialized: str = 'view'
     persist_docs: Dict[str, Any] = field(default_factory=dict)
@@ -86,17 +86,6 @@ class NodeConfig(JsonSchemaMixin, Replaceable):
         dct = self.to_dict(omit_none=False, validate=False)
         dct.update(kwargs)
         return self.from_dict(dct)
-
-    @classmethod
-    def json_schema(cls, embeddable=False):
-        dct = super().json_schema(embeddable=embeddable)
-        cls._schema[cls.__name__]["additionalProperties"] = True
-
-        if embeddable:
-            dct[cls.__name__]["additionalProperties"] = True
-        else:
-            dct["additionalProperties"] = True
-        return dct
 
     @classmethod
     def field_mapping(cls):
@@ -341,8 +330,8 @@ class ParsedNodePatch(JsonSchemaMixin, Replaceable):
 
 
 @dataclass
-class _MacroDependsOn(JsonSchemaMixin, Replaceable):
-    macros: List[str]
+class MacroDependsOn(JsonSchemaMixin, Replaceable):
+    macros: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -351,7 +340,7 @@ class ParsedMacro(UnparsedMacro):
     resource_type: MacroType
     unique_id: str
     tags: List[str]
-    depends_on: _MacroDependsOn
+    depends_on: MacroDependsOn
 
     def local_vars(self):
         return {}
@@ -377,14 +366,14 @@ class ParsedSourceDefinition(
         HasUniqueID,
         HasRelationMetadata,
         HasFqn):
-    quoting: Quoting
     name: str
     source_name: str
     source_description: str
     loader: str
     identifier: str
     resource_type: SourceType
-    loaded_at_field: Optional[str]
+    quoting: Quoting = field(default_factory=Quoting)
+    loaded_at_field: Optional[str] = None
     freshness: FreshnessThreshold = field(default_factory=FreshnessThreshold)
     docrefs: List[Docref] = field(default_factory=list)
     description: str = ''

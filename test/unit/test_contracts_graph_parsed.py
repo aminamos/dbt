@@ -2,9 +2,11 @@ from dbt.node_types import NodeType
 from dbt.contracts.graph.parsed import (
     ParsedNode, DependsOn, NodeConfig, ColumnInfo, Hook, ParsedTestNode,
     TestConfig, ParsedSnapshotNode, TimestampSnapshotConfig, All, Docref,
-    CheckSnapshotConfig, TimestampStrategy, CheckStrategy,
-    IntermediateSnapshotNode, ParsedNodePatch
+    ParsedDocumentation, CheckSnapshotConfig, TimestampStrategy, CheckStrategy,
+    IntermediateSnapshotNode, ParsedNodePatch, ParsedMacro, MacroDependsOn,
+    ParsedSourceDefinition,
 )
+from dbt.contracts.graph.unparsed import Quoting, FreshnessThreshold
 
 from hologram import ValidationError
 from .utils import ContractTestCase
@@ -111,6 +113,7 @@ class TestParsedNode(ContractTestCase):
         self.assertFalse(node.empty)
         self.assertTrue(node.is_refable)
         self.assertFalse(node.is_ephemeral)
+        self.assertEqual(node.local_vars(), {})
 
         minimum = {
             'name': 'foo',
@@ -156,7 +159,7 @@ class TestParsedNode(ContractTestCase):
                 'pre-hook': [],
                 'quoting': {},
                 'tags': [],
-                'vars': {},
+                'vars': {'foo': 100},
             },
             'docrefs': [],
             'columns': {'a': {'name': 'a', 'description': 'a text field'}},
@@ -183,7 +186,8 @@ class TestParsedNode(ContractTestCase):
             config=NodeConfig(
                 column_types={'a': 'text'},
                 materialized='ephemeral',
-                post_hook=[Hook(sql='insert into blah(a, b) select "1", 1')]
+                post_hook=[Hook(sql='insert into blah(a, b) select "1", 1')],
+                vars={'foo': 100},
             ),
             columns={'a': ColumnInfo('a', 'a text field')},
         )
@@ -191,6 +195,7 @@ class TestParsedNode(ContractTestCase):
         self.assertFalse(node.empty)
         self.assertTrue(node.is_refable)
         self.assertTrue(node.is_ephemeral)
+        self.assertEqual(node.local_vars(), {'foo': 100})
 
     def test_invalid_bad_tags(self):
         # bad top-level field
@@ -1393,3 +1398,224 @@ class TestParsedNodePatch(ContractTestCase):
             ],
         )
         self.assert_symmetric(patch, dct)
+
+
+class TestParsedMacro(ContractTestCase):
+    ContractType = ParsedMacro
+
+    def test_ok(self):
+        macro_dict = {
+            'name': 'foo',
+            'path': '/root/path.sql',
+            'original_file_path': '/root/path.sql',
+            'package_name': 'test',
+            'raw_sql': '{% macro foo() %}select 1 as id{% endmacro %}',
+            'root_path': '/root/',
+            'resource_type': 'macro',
+            'unique_id': 'macro.test.foo',
+            'tags': [],
+            'depends_on': {'macros': []}
+        }
+        macro = ParsedMacro(
+            name='foo',
+            path='/root/path.sql',
+            original_file_path='/root/path.sql',
+            package_name='test',
+            raw_sql='{% macro foo() %}select 1 as id{% endmacro %}',
+            root_path='/root/',
+            resource_type=NodeType.Macro,
+            unique_id='macro.test.foo',
+            tags=[],
+            depends_on=MacroDependsOn()
+        )
+        self.assert_symmetric(macro, macro_dict)
+        self.assertEqual(macro.local_vars(), {})
+
+    def test_invalid_missing_unique_id(self):
+        bad_missing_uid = {
+            'name': 'foo',
+            'path': '/root/path.sql',
+            'original_file_path': '/root/path.sql',
+            'package_name': 'test',
+            'raw_sql': '{% macro foo() %}select 1 as id{% endmacro %}',
+            'root_path': '/root/',
+            'resource_type': 'macro',
+            'tags': [],
+            'depends_on': {'macros': []}
+        }
+        self.assert_fails_validation(bad_missing_uid)
+
+    def test_invalid_extra_field(self):
+        bad_extra_field = {
+            'name': 'foo',
+            'path': '/root/path.sql',
+            'original_file_path': '/root/path.sql',
+            'package_name': 'test',
+            'raw_sql': '{% macro foo() %}select 1 as id{% endmacro %}',
+            'root_path': '/root/',
+            'resource_type': 'macro',
+            'unique_id': 'macro.test.foo',
+            'tags': [],
+            'depends_on': {'macros': []},
+            'extra': 'too many fields'
+        }
+        self.assert_fails_validation(bad_extra_field)
+
+
+class TestParsedDocumentation(ContractTestCase):
+    ContractType = ParsedDocumentation
+
+    def test_ok(self):
+        doc_dict = {
+            'block_contents': 'some doc contents',
+            'file_contents': '{% doc foo %}some doc contents{% enddoc %}',
+            'name': 'foo',
+            'original_file_path': '/root/docs/doc.md',
+            'package_name': 'test',
+            'path': '/root/docs',
+            'root_path': '/root',
+            'unique_id': 'test.foo',
+        }
+        doc = self.ContractType(
+            package_name='test',
+            root_path='/root',
+            path='/root/docs',
+            original_file_path='/root/docs/doc.md',
+            file_contents='{% doc foo %}some doc contents{% enddoc %}',
+            name='foo',
+            unique_id='test.foo',
+            block_contents='some doc contents'
+        )
+        self.assert_symmetric(doc, doc_dict)
+
+    def test_invalid_missing(self):
+        bad_missing_contents = {
+            # 'block_contents': 'some doc contents',
+            'file_contents': '{% doc foo %}some doc contents{% enddoc %}',
+            'name': 'foo',
+            'original_file_path': '/root/docs/doc.md',
+            'package_name': 'test',
+            'path': '/root/docs',
+            'root_path': '/root',
+            'unique_id': 'test.foo',
+        }
+        self.assert_fails_validation(bad_missing_contents)
+
+    def test_invalid_extra(self):
+        bad_extra_field = {
+            'block_contents': 'some doc contents',
+            'file_contents': '{% doc foo %}some doc contents{% enddoc %}',
+            'name': 'foo',
+            'original_file_path': '/root/docs/doc.md',
+            'package_name': 'test',
+            'path': '/root/docs',
+            'root_path': '/root',
+            'unique_id': 'test.foo',
+
+            'extra': 'more',
+        }
+        self.assert_fails_validation(bad_extra_field)
+
+
+class TestParsedSourceDefinition(ContractTestCase):
+    ContractType = ParsedSourceDefinition
+
+    def test_basic(self):
+        source_def_dict = {
+            'package_name': 'test',
+            'root_path': '/root',
+            'path': '/root/models/sources.yml',
+            'original_file_path': '/root/models/sources.yml',
+            'database': 'some_db',
+            'schema': 'some_schema',
+            'fqn': ['test', 'source', 'my_source', 'my_source_table'],
+            'source_name': 'my_source',
+            'name': 'my_source_table',
+            'source_description': 'my source description',
+            'loader': 'stitch',
+            'identifier': 'my_source_table',
+            'resource_type': str(NodeType.Source),
+            'description': '',
+            'freshness': {},
+            'docrefs': [],
+            'columns': {},
+            'quoting': {},
+            'unique_id': 'test.source.my_source.my_source_table',
+        }
+        source_def = self.ContractType(
+            columns={},
+            docrefs=[],
+            database='some_db',
+            description='',
+            fqn=['test', 'source', 'my_source', 'my_source_table'],
+            freshness=FreshnessThreshold(),
+            identifier='my_source_table',
+            loader='stitch',
+            name='my_source_table',
+            original_file_path='/root/models/sources.yml',
+            package_name='test',
+            path='/root/models/sources.yml',
+            quoting=Quoting(),
+            resource_type=NodeType.Source,
+            root_path='/root',
+            schema='some_schema',
+            source_description='my source description',
+            source_name='my_source',
+            unique_id='test.source.my_source.my_source_table',
+        )
+        self.assert_symmetric(source_def, source_def_dict)
+        minimum = {
+            'package_name': 'test',
+            'root_path': '/root',
+            'path': '/root/models/sources.yml',
+            'original_file_path': '/root/models/sources.yml',
+            'database': 'some_db',
+            'schema': 'some_schema',
+            'fqn': ['test', 'source', 'my_source', 'my_source_table'],
+            'source_name': 'my_source',
+            'name': 'my_source_table',
+            'source_description': 'my source description',
+            'loader': 'stitch',
+            'identifier': 'my_source_table',
+            'resource_type': str(NodeType.Source),
+            'unique_id': 'test.source.my_source.my_source_table',
+        }
+        self.assert_from_dict(source_def, minimum)
+
+    def test_invalid_missing(self):
+        bad_missing_name = {
+            'package_name': 'test',
+            'root_path': '/root',
+            'path': '/root/models/sources.yml',
+            'original_file_path': '/root/models/sources.yml',
+            'database': 'some_db',
+            'schema': 'some_schema',
+            'fqn': ['test', 'source', 'my_source', 'my_source_table'],
+            'source_name': 'my_source',
+            # 'name': 'my_source_table',
+            'source_description': 'my source description',
+            'loader': 'stitch',
+            'identifier': 'my_source_table',
+            'resource_type': str(NodeType.Source),
+            'unique_id': 'test.source.my_source.my_source_table',
+        }
+        self.assert_fails_validation(bad_missing_name)
+
+    def test_invalid_bad_resource_type(self):
+        bad_resource_type = {
+            'package_name': 'test',
+            'root_path': '/root',
+            'path': '/root/models/sources.yml',
+            'original_file_path': '/root/models/sources.yml',
+            'database': 'some_db',
+            'schema': 'some_schema',
+            'fqn': ['test', 'source', 'my_source', 'my_source_table'],
+            'source_name': 'my_source',
+            'name': 'my_source_table',
+            'source_description': 'my source description',
+            'loader': 'stitch',
+            'identifier': 'my_source_table',
+            'resource_type': str(NodeType.Model),
+            'unique_id': 'test.source.my_source.my_source_table',
+        }
+        self.assert_fails_validation(bad_resource_type)

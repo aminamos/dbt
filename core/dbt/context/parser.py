@@ -20,8 +20,8 @@ def docs(unparsed, docrefs, column_name=None):
                         column_name=column_name)
         docrefs.append(docref)
 
-        # IDK
-        return True
+        # At parse time, nothing should care about what doc() returns
+        return ''
 
     return do_docs
 

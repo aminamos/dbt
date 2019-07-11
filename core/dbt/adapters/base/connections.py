@@ -61,15 +61,6 @@ class Credentials(
             })
         return serialized
 
-    @classmethod
-    def concrete_subclasses(cls):
-        subs = cls.__subclasses__()
-        while subs:
-            scls = subs.pop()
-            subs.extend(scls.__subclasses__())
-            if not scls.__abstractmethods__:
-                yield scls
-
 
 class BaseConnectionManager(metaclass=abc.ABCMeta):
     """Methods to implement:
