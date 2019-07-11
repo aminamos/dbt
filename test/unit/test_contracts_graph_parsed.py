@@ -2,9 +2,9 @@ from dbt.node_types import NodeType
 from dbt.contracts.graph.parsed import (
     ParsedNode, DependsOn, NodeConfig, ColumnInfo, Hook, ParsedTestNode,
     TestConfig, ParsedSnapshotNode, TimestampSnapshotConfig, All, Docref,
-    ParsedDocumentation, CheckSnapshotConfig, TimestampStrategy, CheckStrategy,
-    IntermediateSnapshotNode, ParsedNodePatch, ParsedMacro, MacroDependsOn,
-    ParsedSourceDefinition,
+    GenericSnapshotConfig, CheckSnapshotConfig, TimestampStrategy,
+    CheckStrategy, IntermediateSnapshotNode, ParsedNodePatch, ParsedMacro,
+    MacroDependsOn, ParsedSourceDefinition, ParsedDocumentation,
 )
 from dbt.contracts.graph.unparsed import Quoting, FreshnessThreshold
 
@@ -1063,6 +1063,36 @@ class TestCheckSnapshotConfig(ContractTestCase):
         self.assert_fails_validation(invalid_check_type)
 
 
+class TestGenericSnapshotConfig(ContractTestCase):
+    ContractType = GenericSnapshotConfig
+
+    def test_ok(self):
+        cfg_dict = {
+            'column_types': {},
+            'enabled': True,
+            'materialized': 'view',
+            'persist_docs': {},
+            'post-hook': [],
+            'pre-hook': [],
+            'quoting': {},
+            'tags': [],
+            'vars': {},
+            'unique_key': 'id',
+            'strategy': 'hello',
+            'target_database': 'some_snapshot_db',
+            'target_schema': 'some_snapshot_schema',
+            'magic_key': 'magic',
+        }
+        cfg = self.ContractType(
+            strategy='hello',
+            unique_key='id',
+            target_database='some_snapshot_db',
+            target_schema='some_snapshot_schema',
+        )
+        cfg._extra.update({'magic_key': 'magic'})
+        self.assert_symmetric(cfg, cfg_dict)
+
+
 class TestParsedSnapshotNode(ContractTestCase):
     ContractType = ParsedSnapshotNode
 
@@ -1273,8 +1303,8 @@ class TestParsedSnapshotNode(ContractTestCase):
         self.assertTrue(node.is_refable)
         self.assertFalse(node.is_ephemeral)
 
-    def test_invalid_bad_strategy(self):
-        bad_strategy = {
+    def test_ok_unknown_strategy(self):
+        unknown_strategy = {
             'name': 'foo',
             'root_path': '/root/',
             'resource_type': str(NodeType.Snapshot),
@@ -1311,8 +1341,35 @@ class TestParsedSnapshotNode(ContractTestCase):
             'docrefs': [],
             'columns': {},
         }
+        config = GenericSnapshotConfig(
+                strategy='unknown',
+                unique_key='id',
+                target_database='some_snapshot_db',
+                target_schema='some_snapshot_schema',
+        )
+        config._extra.update({'magic_key': 'something'})
 
-        self.assert_fails_validation(bad_strategy)
+        node = self.ContractType(
+            package_name='test',
+            root_path='/root/',
+            path='/root/x/path.sql',
+            original_file_path='/root/path.sql',
+            raw_sql='select * from wherever',
+            name='foo',
+            resource_type=NodeType.Snapshot,
+            unique_id='model.test.foo',
+            fqn=['test', 'models', 'foo'],
+            refs=[],
+            sources=[],
+            depends_on=DependsOn(),
+            description='',
+            database='test_db',
+            schema='test_schema',
+            alias='bar',
+            tags=[],
+            config=config,
+        )
+        self.assert_symmetric(node, unknown_strategy)
 
     def test_invalid_bad_resource_type(self):
         bad_resource_type = {

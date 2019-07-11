@@ -222,10 +222,18 @@ class _SnapshotConfig(NodeConfig):
         target_schema: str,
         **kwargs
     ) -> None:
-
         self.target_database = target_database
         self.target_schema = target_schema
         self.unique_key = unique_key
+        super().__init__(**kwargs)
+
+
+@dataclass(init=False)
+class GenericSnapshotConfig(_SnapshotConfig):
+    strategy: str
+
+    def __init__(self, strategy: str, **kwargs) -> None:
+        self.strategy = strategy
         super().__init__(**kwargs)
 
 
@@ -275,7 +283,9 @@ class IntermediateSnapshotNode(ParsedNode):
 
 
 def _create_if_else_chain(
-    key: str, criteria: List[Tuple[str, Type[JsonSchemaMixin]]]
+    key: str,
+    criteria: List[Tuple[str, Type[JsonSchemaMixin]]],
+    default: Type[JsonSchemaMixin]
 ) -> dict:
     """Mutate a given schema key that contains a 'oneOf' to instead be an
     'if-then-else' chain. This results is much better/more consistent errors
@@ -291,15 +301,18 @@ def _create_if_else_chain(
         schema['then'] = then_clause.json_schema()
         schema['else'] = {}
         schema = schema['else']
-    schema['additionalProperties'] = False
-    schema['required'] = ['invalid']
+    schema.update(default.json_schema())
     return result
 
 
 @dataclass
 class ParsedSnapshotNode(ParsedNode):
     resource_type: SnapshotType
-    config: Union[CheckSnapshotConfig, TimestampSnapshotConfig]
+    config: Union[
+        CheckSnapshotConfig,
+        TimestampSnapshotConfig,
+        GenericSnapshotConfig,
+    ]
 
     @classmethod
     def json_schema(cls):
@@ -312,7 +325,7 @@ class ParsedSnapshotNode(ParsedNode):
         ]
 
         schema['properties']['config'] = _create_if_else_chain(
-            'strategy', configs
+            'strategy', configs, GenericSnapshotConfig
         )
         return schema
 

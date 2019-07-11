@@ -80,22 +80,6 @@ class Manifest:
         self.generated_at = generated_at
         self.disabled = disabled
 
-    def writable_manifest(self):
-        forward_edges, backward_edges = build_edges(self.nodes.values())
-        return WritableManifest(
-            nodes=self.nodes,
-            macros=self.macros,
-            docs=self.docs,
-            generated_at=self.generated_at,
-            metadata=self.metadata,
-            disabled=self.disabled,
-            child_map=forward_edges,
-            parent_map=backward_edges
-        )
-
-    def write(self, path):
-        self.writable_manifest().write(path)
-
     @staticmethod
     def get_metadata(config: Optional[Project]) -> ManifestMetadata:
         project_id = None
@@ -331,6 +315,45 @@ class Manifest:
             disabled=[_deepcopy(n) for n in self.disabled],
             config=config
         )
+
+    def writable_manifest(self):
+        forward_edges, backward_edges = build_edges(self.nodes.values())
+        return WritableManifest(
+            nodes=self.nodes,
+            macros=self.macros,
+            docs=self.docs,
+            generated_at=self.generated_at,
+            metadata=self.metadata,
+            disabled=self.disabled,
+            child_map=forward_edges,
+            parent_map=backward_edges
+        )
+
+    @classmethod
+    def from_writable_manifest(cls, writable):
+        self = cls(
+            nodes=writable.nodes,
+            macros=writable.macros,
+            docs=writable.docs,
+            generated_at=writable.generated_at,
+            metadata=writable.metadata,
+            disabled=writable.disabled,
+        )
+        self.metadata = writable.metadata
+        return self
+
+    @classmethod
+    def from_dict(cls, data, validate=True):
+        writable = WritableManifest.from_dict(data=data, validate=validate)
+        return cls.from_writable_manifest(writable)
+
+    def to_dict(self, omit_none=True, validate=False):
+        return self.writable_manifest().to_dict(
+            omit_none=omit_none, validate=validate
+        )
+
+    def write(self, path):
+        self.writable_manifest().write(path)
 
 
 @dataclass
