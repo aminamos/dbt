@@ -25,5 +25,5 @@ class Mergeable(Replaceable):
 
 
 class Writable:
-    def write(self, path: str, omit_none: bool = True):
+    def write(self, path: str, omit_none: bool = False):
         write_json(path, self.to_dict(omit_none=omit_none))
