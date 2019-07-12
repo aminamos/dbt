@@ -10,7 +10,7 @@ from dbt.clients.yaml_helper import load_yaml_text
 from dbt.exceptions import DbtProjectError
 from dbt.exceptions import RecursionException
 from dbt.exceptions import SemverException
-from dbt.exceptions import ValidationException
+from dbt.exceptions import validator_error_message
 from dbt.exceptions import warn_or_error
 from dbt.semver import VersionSpecifier
 from dbt.semver import versions_compatible
@@ -121,8 +121,10 @@ def package_config_from_data(packages_data):
 
     try:
         packages = PackageConfig.from_dict(packages_data)
-    except (ValidationException, ValidationError) as e:
-        raise DbtProjectError('Invalid package config: {}'.format(str(e)))
+    except ValidationError as e:
+        raise DbtProjectError(
+            'Invalid package config: {}'.format(validator_error_message(e))
+        ) from e
     return packages
 
 
@@ -218,8 +220,8 @@ class Project:
         # just for validation.
         try:
             ProjectContract.from_dict(project_dict)
-        except (ValidationException, ValidationError) as e:
-            raise DbtProjectError(str(e))
+        except ValidationError as e:
+            raise DbtProjectError(validator_error_message(e)) from e
 
         # name/version are required in the Project definition, so we can assume
         # they are present
@@ -256,12 +258,12 @@ class Project:
         try:
             dbt_version = _parse_versions(dbt_raw_version)
         except SemverException as e:
-            raise DbtProjectError(str(e))
+            raise DbtProjectError(str(e)) from e
 
         try:
             packages = package_config_from_data(packages_dict)
-        except (ValidationException, ValidationError) as e:
-            raise DbtProjectError(str(e))
+        except ValidationError as e:
+            raise DbtProjectError(validator_error_message(e)) from e
 
         project = cls(
             project_name=name,
@@ -341,8 +343,8 @@ class Project:
     def validate(self):
         try:
             ProjectContract.from_dict(self.to_project_config())
-        except (ValidationException, ValidationError) as exc:
-            raise DbtProjectError(str(exc))
+        except ValidationError as e:
+            raise DbtProjectError(validator_error_message(e)) from e
 
     @classmethod
     def from_project_root(cls, project_root, cli_vars):

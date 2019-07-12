@@ -2,10 +2,13 @@
 import os
 
 import dbt.contracts.project
-import dbt.exceptions
 import dbt.clients.system
 import dbt.utils
 import dbt.flags
+from dbt.exceptions import (
+    CompilationException, InternalException, NotImplementedException,
+    raise_duplicate_resource_name, validator_error_message
+)
 
 from dbt.contracts.graph.unparsed import UnparsedNode
 from dbt.parser.base import MacrosKnownParser
@@ -19,7 +22,7 @@ class BaseSqlParser(MacrosKnownParser):
 
     @classmethod
     def get_compiled_path(cls, name, relative_path):
-        raise dbt.exceptions.NotImplementedException("Not implemented")
+        raise NotImplementedException("Not implemented")
 
     def load_and_parse(self, package_name, root_dir, relative_dirs,
                        resource_type, tags=None):
@@ -87,12 +90,13 @@ class BaseSqlParser(MacrosKnownParser):
             node_parsed = self.parse_node(node, unique_id, project, tags=tags)
         except ValidationError as exc:
             # we got a ValidationError - probably bad types in config()
-            raise dbt.exceptions.ValidationException(str(exc)) from exc
+            msg = validator_error_message(exc)
+            raise CompilationException(msg, node=node) from exc
 
         if not parse_ok:
             # if we had a parse error in parse_node, we would not get here. So
             # this means we rejected a good file :(
-            raise dbt.exceptions.InternalException(
+            raise InternalException(
                 'the block parser rejected a good node: {} was marked invalid '
                 'but is actually valid!'.format(node.original_file_path)
             )
@@ -133,7 +137,7 @@ class SQLParseResult:
 
     def keep(self, unique_id, node):
         if unique_id in self.parsed:
-            dbt.exceptions.raise_duplicate_resource_name(
+            raise_duplicate_resource_name(
                 self.parsed[unique_id], node
             )
 

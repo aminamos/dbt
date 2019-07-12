@@ -5,7 +5,7 @@ import pprint
 from dbt.utils import parse_cli_vars
 from dbt.contracts.project import Configuration
 from dbt.exceptions import DbtProjectError
-from dbt.exceptions import ValidationException
+from dbt.exceptions import validator_error_message
 from dbt.adapters.factory import get_relation_class_by_name
 
 from .profile import Profile
@@ -157,8 +157,8 @@ class RuntimeConfig(Project, Profile):
         """
         try:
             Configuration.from_dict(self.serialize())
-        except (ValidationException, ValidationError) as e:
-            raise DbtProjectError(str(e))
+        except ValidationError as e:
+            raise DbtProjectError(validator_error_message(e)) from e
 
         if getattr(self.args, 'version_check', False):
             self.validate_version()

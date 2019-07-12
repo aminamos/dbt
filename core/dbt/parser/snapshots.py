@@ -1,7 +1,7 @@
 
 from dbt.contracts.graph.parsed import ParsedSnapshotNode, \
     IntermediateSnapshotNode
-from dbt.exceptions import CompilationException
+from dbt.exceptions import CompilationException, validator_error_message
 from dbt.node_types import NodeType
 from dbt.parser.base_sql import BaseSqlParser, SQLParseResult
 import dbt.clients.jinja
@@ -67,7 +67,7 @@ class SnapshotParser(BaseSqlParser):
                 return set_snapshot_attributes(parsed_node)
 
             except ValidationError as exc:
-                raise CompilationException(str(exc), node)
+                raise CompilationException(validator_error_message(exc), node)
         else:
             return node
 

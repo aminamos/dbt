@@ -11,6 +11,7 @@ from dbt.exceptions import DbtProfileError
 from dbt.exceptions import DbtProjectError
 from dbt.exceptions import ValidationException
 from dbt.exceptions import RuntimeException
+from dbt.exceptions import validator_error_message
 from dbt.logger import GLOBAL_LOGGER as logger
 from dbt.utils import parse_cli_vars
 
@@ -51,9 +52,9 @@ def read_profile(profiles_dir):
         try:
             contents = load_file_contents(path, strip=False)
             return load_yaml_text(contents)
-        except (ValidationException, ValidationError) as e:
+        except ValidationException as e:
             msg = INVALID_PROFILE_MESSAGE.format(error_string=e)
-            raise ValidationException(msg)
+            raise ValidationException(msg) from e
 
     return {}
 
@@ -117,8 +118,8 @@ class Profile:
             ProfileConfig.from_dict(
                 self.to_profile_info(serialize_credentials=True)
             )
-        except (ValidationException, ValidationError) as exc:
-            raise DbtProfileError(str(exc))
+        except ValidationError as exc:
+            raise DbtProfileError(validator_error_message(exc)) from exc
 
     @staticmethod
     def _credentials_from_profile(profile, profile_name, target_name):
@@ -134,11 +135,13 @@ class Profile:
         try:
             cls = load_plugin(typename)
             credentials = cls.from_dict(profile)
-        except (RuntimeException, ValidationException, ValidationError) as e:
+        except (RuntimeException, ValidationError) as e:
+            msg = str(e) if isinstance(e, RuntimeException) else e.message
             raise DbtProfileError(
                 'Credentials in profile "{}", target "{}" invalid: {}'
-                .format(profile_name, target_name, str(e))
-            )
+                .format(profile_name, target_name, msg)
+            ) from e
+
         return credentials
 
     @staticmethod

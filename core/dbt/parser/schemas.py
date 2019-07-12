@@ -26,7 +26,7 @@ from dbt.contracts.graph.parsed import ParsedNodePatch, ParsedTestNode, \
     ParsedSourceDefinition
 from dbt.parser.base import MacrosKnownParser
 from dbt.config.renderer import ConfigRenderer
-from dbt.exceptions import JSONValidationException
+from dbt.exceptions import JSONValidationException, validator_error_message
 
 from typing import Dict, List
 
@@ -239,7 +239,8 @@ def _filter_validate(filepath, location, values, validate):
             # we don't want to fail the full run, but we do want to fail
             # parsing this file
         except ValidationError as exc:
-            warn_invalid(filepath, location, value, '- ' + str(exc))
+            msg = validator_error_message(exc)
+            warn_invalid(filepath, location, value, '- ' + msg)
             continue
         except JSONValidationException as exc:
             warn_invalid(filepath, location, value, '- ' + exc.msg)

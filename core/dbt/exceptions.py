@@ -4,6 +4,18 @@ import functools
 from dbt.logger import GLOBAL_LOGGER as logger
 import dbt.flags
 
+import hologram
+
+
+def validator_error_message(exc):
+    """Given a hologram.ValidationError (which is basically a
+    jsonschema.ValidationError), return the relevant parts as a string
+    """
+    if not isinstance(exc, hologram.ValidationError):
+        return str(exc)
+    path = "[%s]" % "][".join(map(repr, exc.relative_path))
+    return 'at path {}: {}'.format(path, exc.message)
+
 
 class Exception(builtins.Exception):
     CODE = -32000
