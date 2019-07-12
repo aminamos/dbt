@@ -1,5 +1,5 @@
 from dbt.contracts.graph.parsed import (
-    ParsedMacro, ParsedNodeMixins, ParsedNode, ParsedSourceDefinition,
+    ParsedNodeMixins, ParsedNode, ParsedSourceDefinition,
     ParsedNodeDefaults, TestType, ParsedTestNode, TestConfig
 )
 
@@ -8,7 +8,7 @@ from dbt.contracts.util import Replaceable
 from hologram import JsonSchemaMixin
 from dataclasses import dataclass, field
 import sqlparse
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Union
 
 
 @dataclass
@@ -31,7 +31,7 @@ class CompiledNodeDefaults(ParsedNodeDefaults, ParsedNodeMixins):
     injected_sql: Optional[str] = None
     wrapped_sql: Optional[str] = None
 
-    def prepend_ctes(self, prepended_ctes):
+    def prepend_ctes(self, prepended_ctes: List[InjectedCTE]):
         self.extra_ctes_injected = True
         self.extra_ctes = prepended_ctes
         self.injected_sql = _inject_ctes_into_sql(
@@ -40,7 +40,7 @@ class CompiledNodeDefaults(ParsedNodeDefaults, ParsedNodeMixins):
         )
         self.validate(self.to_dict())
 
-    def set_cte(self, cte_id, sql):
+    def set_cte(self, cte_id: str, sql: str):
         """This is the equivalent of what self.extra_ctes[cte_id] = sql would
         do if extra_ctes were an OrderedDict
         """
@@ -70,20 +70,20 @@ class CompiledTestNode(CompiledNodeDefaults):
     config: TestConfig = field(default_factory=TestConfig)
 
 
-@dataclass
-class CompiledGraph(JsonSchemaMixin, Replaceable):
-    nodes: Dict[str, CompiledNode]
-    macros: Dict[str, ParsedMacro]
-
-
-def _inject_ctes_into_sql(sql, ctes):
+def _inject_ctes_into_sql(sql: str, ctes: List[InjectedCTE]) -> str:
     """
-    `ctes` is a dict of CTEs in the form:
+    `ctes` is a list of InjectedCTEs like:
 
-      {
-        "cte_id_1": "__dbt__CTE__ephemeral as (select * from table)",
-        "cte_id_2": "__dbt__CTE__events as (select id, type from events)"
-      }
+        [
+            InjectedCTE(
+                id="cte_id_1",
+                sql="__dbt__CTE__ephemeral as (select * from table)",
+            ),
+            InjectedCTE(
+                id="cte_id_2",
+                sql="__dbt__CTE__events as (select id, type from events)",
+            ),
+        ]
 
     Given `sql` like:
 
