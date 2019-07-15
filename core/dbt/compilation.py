@@ -75,8 +75,7 @@ def recursively_prepend_ctes(model, manifest):
         return (model, model.extra_ctes, manifest)
 
     if dbt.flags.STRICT_MODE:
-        # ensure that the cte we're adding to is compiled
-        _compiled_type_for(model).from_dict(model.to_dict())
+        assert isinstance(model, (CompiledNode, CompiledTestNode))
 
     prepended_ctes = []
 
