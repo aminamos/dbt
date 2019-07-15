@@ -400,8 +400,6 @@ def generate_base(model, model_dict, config, manifest, source_config,
         "exceptions": dbt.exceptions.wrapped_exports(model),
         "execute": provider.execute,
         "flags": dbt.flags,
-        # TODO: Do we have to leave this in?
-        "graph": manifest.to_flat_graph(),
         "load_agate_table": _build_load_agate_table(model),
         "log": log,
         "model": model_dict,
